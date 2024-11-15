@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Caméra Babycam</title>
+    <style>
+        body { text-align: center; background-color: #f0f0f0; }
+        video { width: 90%; max-width: 400px; border: 2px solid #333; margin-top: 20px; }
+        button { padding: 10px 20px; font-size: 16px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Caméra Babycam</h1>
+    <video id="video" autoplay muted></video>
+    <br>
+    <button id="start">Démarrer la diffusion</button>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const video = document.getElementById('video');
+        const startButton = document.getElementById('start');
+
+        let mediaRecorder;
+
+        startButton.onclick = async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            video.srcObject = stream;
+
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8, vorbis' });
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const base64Data = btoa(String.fromCharCode(...new Uint8Array(reader.result)));
+                        socket.emit('video-stream', base64Data);
+                    };
+                    reader.readAsArrayBuffer(event.data);
+                }
+            };
+
+            mediaRecorder.start(100); // Envoie des données toutes les 100ms
+            startButton.disabled = true;
+        };
+    </script>
+</body>
+</html>

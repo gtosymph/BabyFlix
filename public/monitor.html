@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Moniteur Babycam</title>
+    <style>
+        body { text-align: center; background-color: #f0f0f0; }
+        video { width: 90%; max-width: 600px; border: 2px solid #333; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Moniteur Babycam</h1>
+    <video id="video" autoplay></video>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const video = document.getElementById('video');
+        const mediaSource = new MediaSource();
+        video.src = URL.createObjectURL(mediaSource);
+
+        mediaSource.addEventListener('sourceopen', () => {
+            const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8, vorbis"');
+
+            socket.on('video-stream', (data) => {
+                const arrayBuffer = Uint8Array.from(atob(data), c => c.charCodeAt(0)).buffer;
+                sourceBuffer.appendBuffer(arrayBuffer);
+            });
+        });
+    </script>
+</body>
+</html>
