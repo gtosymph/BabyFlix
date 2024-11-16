@@ -4,9 +4,36 @@
     <meta charset="UTF-8">
     <title>Caméra Babycam</title>
     <style>
-        body { text-align: center; background-color: #f0f0f0; }
-        video { width: 90%; max-width: 400px; border: 2px solid #333; margin-top: 20px; }
-        button { padding: 10px 20px; font-size: 16px; margin-top: 20px; }
+        body { 
+            text-align: center; 
+            background-color: #f0f0f0; 
+            font-family: Arial, sans-serif;
+        }
+        video { 
+            width: 90%; 
+            max-width: 400px; 
+            border: 2px solid #333; 
+            margin-top: 20px; 
+        }
+        button { 
+            padding: 10px 20px; 
+            font-size: 16px; 
+            margin-top: 20px; 
+            cursor: pointer;
+        }
+        #logs {
+            width: 90%;
+            max-width: 400px;
+            height: 200px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            margin: 20px auto;
+            padding: 10px;
+            overflow-y: scroll;
+            text-align: left;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -14,6 +41,7 @@
     <video id="video" autoplay muted></video>
     <br>
     <button id="start">Démarrer la diffusion</button>
+    <div id="logs"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -21,29 +49,54 @@
 
         const video = document.getElementById('video');
         const startButton = document.getElementById('start');
+        const logs = document.getElementById('logs');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.textContent += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
 
         let mediaRecorder;
 
         startButton.onclick = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            video.srcObject = stream;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                video.srcObject = stream;
+                log('Accès à la caméra autorisé.');
 
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8, vorbis' });
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        const base64Data = btoa(String.fromCharCode(...new Uint8Array(reader.result)));
-                        socket.emit('video-stream', base64Data);
-                    };
-                    reader.readAsArrayBuffer(event.data);
-                }
-            };
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        event.data.arrayBuffer().then(buffer => {
+                            socket.emit('video-stream', buffer);
+                            log('Données vidéo envoyées au serveur.');
+                        }).catch(e => {
+                            log('Erreur lors de la conversion des données vidéo: ' + e);
+                        });
+                    }
+                };
 
-            mediaRecorder.start(100); // Envoie des données toutes les 100ms
-            startButton.disabled = true;
+                mediaRecorder.start(100); // Envoie des données toutes les 100ms
+                log('MediaRecorder démarré.');
+                startButton.disabled = true;
+            } catch (e) {
+                log('Erreur lors de l\'accès à la caméra: ' + e);
+            }
         };
+
+        socket.on('connect', () => {
+            log('Connecté au serveur.');
+        });
+
+        socket.on('disconnect', () => {
+            log('Déconnecté du serveur.');
+        });
+
+        socket.on('error', (error) => {
+            log('Erreur Socket.io: ' + error);
+        });
     </script>
 </body>
 </html>

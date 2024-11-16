@@ -4,29 +4,85 @@
     <meta charset="UTF-8">
     <title>Moniteur Babycam</title>
     <style>
-        body { text-align: center; background-color: #f0f0f0; }
-        video { width: 90%; max-width: 600px; border: 2px solid #333; margin-top: 20px; }
+        body { 
+            text-align: center; 
+            background-color: #f0f0f0; 
+            font-family: Arial, sans-serif;
+        }
+        video { 
+            width: 90%; 
+            max-width: 600px; 
+            border: 2px solid #333; 
+            margin-top: 20px; 
+        }
+        #logs {
+            width: 90%;
+            max-width: 600px;
+            height: 200px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            margin: 20px auto;
+            padding: 10px;
+            overflow-y: scroll;
+            text-align: left;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
     <h1>Moniteur Babycam</h1>
-    <video id="video" autoplay></video>
+    <video id="video" autoplay controls></video>
+    <div id="logs"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
 
         const video = document.getElementById('video');
-        const mediaSource = new MediaSource();
+        const logs = document.getElementById('logs');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.textContent += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        let mediaSource = new MediaSource();
         video.src = URL.createObjectURL(mediaSource);
 
+        let sourceBuffer;
+
         mediaSource.addEventListener('sourceopen', () => {
-            const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8, vorbis"');
+            try {
+                sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs=vp8');
+                sourceBuffer.mode = 'segments';
+                log('SourceBuffer créé et MediaSource ouvert.');
+            } catch (e) {
+                log('Erreur lors de l\'ajout du SourceBuffer: ' + e);
+            }
 
             socket.on('video-stream', (data) => {
-                const arrayBuffer = Uint8Array.from(atob(data), c => c.charCodeAt(0)).buffer;
-                sourceBuffer.appendBuffer(arrayBuffer);
+                log('Données vidéo reçues sur le moniteur.');
+                try {
+                    sourceBuffer.appendBuffer(new Uint8Array(data));
+                    log('Données vidéo ajoutées au SourceBuffer.');
+                } catch (e) {
+                    log('Erreur lors de l\'ajout des données au SourceBuffer: ' + e);
+                }
             });
+        });
+
+        mediaSource.addEventListener('error', (e) => {
+            log('Erreur MediaSource: ' + e);
+        });
+
+        socket.on('connect', () => {
+            log('Connecté au serveur.');
+        });
+
+        socket.on('disconnect', () => {
+            log('Déconnecté du serveur.');
         });
     </script>
 </body>
