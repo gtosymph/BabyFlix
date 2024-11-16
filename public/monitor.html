@@ -1,98 +1,30 @@
+<!-- public/monitor.html -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <title>Moniteur Babycam</title>
-    <style>
-        body { 
-            text-align: center; 
-            background-color: #f0f0f0; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        h1 {
-            color: #333;
-        }
-        video { 
-            width: 90%; 
-            max-width: 600px; 
-            border: 4px solid #4CAF50; 
-            border-radius: 10px;
-            margin-top: 20px; 
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        #logs {
-            width: 90%;
-            max-width: 600px;
-            height: 200px;
-            border: 2px solid #ccc;
-            background-color: #fff;
-            margin: 20px auto;
-            padding: 10px;
-            overflow-y: scroll;
-            text-align: left;
-            font-size: 14px;
-            white-space: pre-wrap;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-    </style>
+    <link rel="stylesheet" href="css/monitor.css">
 </head>
 <body>
     <h1>Moniteur Babycam</h1>
     <video id="video" autoplay controls></video>
+    
+    <div class="controls">
+        <div class="slider-container">
+            <label for="motionThreshold">Seuil de Détection de Mouvement: <span id="motionValue" class="slider-value">30</span></label>
+            <input type="range" id="motionThreshold" min="10" max="100" value="30">
+        </div>
+        <div class="slider-container">
+            <label for="noiseThreshold">Seuil de Détection de Bruit: <span id="noiseValue" class="slider-value">0.02</span></label>
+            <input type="range" id="noiseThreshold" min="0.01" max="0.1" step="0.01" value="0.02">
+        </div>
+    </div>
+    
+    <div id="alerts" class="alert-message"></div>
     <div id="logs"></div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-
-        const video = document.getElementById('video');
-        const logs = document.getElementById('logs');
-
-        function log(message) {
-            const timestamp = new Date().toLocaleTimeString();
-            logs.textContent += `[${timestamp}] ${message}\n`;
-            logs.scrollTop = logs.scrollHeight;
-        }
-
-        let mediaSource = new MediaSource();
-        video.src = URL.createObjectURL(mediaSource);
-
-        let sourceBuffer;
-
-        mediaSource.addEventListener('sourceopen', () => {
-            try {
-                sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs=vp8');
-                sourceBuffer.mode = 'segments';
-                log('SourceBuffer créé et MediaSource ouvert.');
-            } catch (e) {
-                log('Erreur lors de l\'ajout du SourceBuffer: ' + e);
-            }
-
-            socket.on('video-stream', (data) => {
-                log('Données vidéo reçues sur le moniteur.');
-                try {
-                    sourceBuffer.appendBuffer(new Uint8Array(data));
-                    log('Données vidéo ajoutées au SourceBuffer.');
-                } catch (e) {
-                    log('Erreur lors de l\'ajout des données au SourceBuffer: ' + e);
-                }
-            });
-        });
-
-        mediaSource.addEventListener('error', (e) => {
-            log('Erreur MediaSource: ' + e);
-        });
-
-        socket.on('connect', () => {
-            log('Connecté au serveur.');
-        });
-
-        socket.on('disconnect', () => {
-            log('Déconnecté du serveur.');
-        });
-    </script>
+    <script src="js/monitor.js"></script>
 </body>
 </html>
