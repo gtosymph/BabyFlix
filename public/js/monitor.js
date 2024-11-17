@@ -1,101 +1,54 @@
-/* public/js/monitor.js */
-
-document.addEventListener('DOMContentLoaded', () => {
-    const socket = io();
-
-    const video = document.getElementById('video');
-    const logs = document.getElementById('logs');
-    const alerts = document.getElementById('alerts');
-
-    const motionSlider = document.getElementById('motionThreshold');
-    const noiseSlider = document.getElementById('noiseThreshold');
-    const motionValue = document.getElementById('motionValue');
-    const noiseValue = document.getElementById('noiseValue');
-
-    function log(message) {
-        const timestamp = new Date().toLocaleTimeString();
-        logs.textContent += `[${timestamp}] ${message}\n`;
-        logs.scrollTop = logs.scrollHeight;
+const socket = io();
+const remoteVideo = document.getElementById('remoteVideo');
+let peerConnection;
+const servers = {
+  iceServers: [
+    {
+      urls: 'stun:stun.l.google.com:19302'
     }
+  ]
+};
 
-    function showAlert(message) {
-        alerts.textContent = message;
-        alerts.style.display = 'block';
-        setTimeout(() => {
-            alerts.style.display = 'none';
-        }, 5000); // Masquer après 5 secondes
+// Fonction pour créer la connexion peer-to-peer
+function createPeerConnection() {
+  peerConnection = new RTCPeerConnection(servers);
+
+  // Ajout des candidats ICE reçus au pair
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit('ice-candidate', event.candidate);
     }
+  };
 
-    // Mettre à jour les valeurs des sliders et envoyer les nouvelles seuils au serveur
-    motionSlider.oninput = function() {
-        motionValue.textContent = this.value;
-        sendThresholds();
-    };
-
-    noiseSlider.oninput = function() {
-        noiseValue.textContent = this.value;
-        sendThresholds();
-    };
-
-    function sendThresholds() {
-        const motionThreshold = parseInt(motionSlider.value);
-        const noiseThreshold = parseFloat(noiseSlider.value);
-        socket.emit('update-thresholds', { motionThreshold, noiseThreshold });
-        log(`Seuils mis à jour: Mouvement=${motionThreshold}, Bruit=${noiseThreshold}`);
+  // Définir la vidéo distante lorsqu'une piste est reçue
+  peerConnection.ontrack = (event) => {
+    if (remoteVideo.srcObject !== event.streams[0]) {
+      remoteVideo.srcObject = event.streams[0];
     }
+  };
+}
 
-    socket.on('thresholds', (data) => {
-        if (data.motionThreshold !== undefined) {
-            motionSlider.value = data.motionThreshold;
-            motionValue.textContent = data.motionThreshold;
-        }
-        if (data.noiseThreshold !== undefined) {
-            noiseSlider.value = data.noiseThreshold;
-            noiseValue.textContent = data.noiseThreshold;
-        }
-        log(`Seuils reçus: Mouvement=${data.motionThreshold}, Bruit=${data.noiseThreshold}`);
-    });
+// Réagir à une offre envoyée par le diffuseur
+socket.on('offer', async (offer) => {
+  if (!peerConnection) {
+    createPeerConnection();
+  }
 
-    socket.on('video-stream', (data) => {
-        log('Données vidéo reçues sur le moniteur.');
-        try {
-            sourceBuffer.appendBuffer(new Uint8Array(data));
-            log('Données vidéo ajoutées au SourceBuffer.');
-        } catch (e) {
-            log('Erreur lors de l\'ajout des données au SourceBuffer: ' + e);
-        }
-    });
+  try {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit('answer', answer);
+  } catch (error) {
+    console.error('Erreur lors de la gestion de l\'offre :', error);
+  }
+});
 
-    socket.on('alert', (message) => {
-        log('Alerte reçue: ' + message);
-        showAlert(message);
-    });
-
-    // Gestion du MediaSource
-    let mediaSource = new MediaSource();
-    video.src = URL.createObjectURL(mediaSource);
-
-    let sourceBuffer;
-
-    mediaSource.addEventListener('sourceopen', () => {
-        try {
-            sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs=vp8');
-            sourceBuffer.mode = 'segments';
-            log('SourceBuffer créé et MediaSource ouvert.');
-        } catch (e) {
-            log('Erreur lors de l\'ajout du SourceBuffer: ' + e);
-        }
-    });
-
-    mediaSource.addEventListener('error', (e) => {
-        log('Erreur MediaSource: ' + e);
-    });
-
-    socket.on('connect', () => {
-        log('Connecté au serveur.');
-    });
-
-    socket.on('disconnect', () => {
-        log('Déconnecté du serveur.');
-    });
+// Réagir aux candidats ICE envoyés par le diffuseur
+socket.on('ice-candidate', async (candidate) => {
+  try {
+    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout du candidat ICE :', error);
+  }
 });

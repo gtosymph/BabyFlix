@@ -1,20 +1,13 @@
-<!-- public/camera.html -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Caméra Babycam</title>
-    <link rel="stylesheet" href="css/camera.css">
+  <meta charset="UTF-8">
+  <title>Diffuseur</title>
 </head>
 <body>
-    <h1>Caméra Babycam</h1>
-    <video id="video" autoplay muted></video>
-    <br>
-    <button id="start">Démarrer la diffusion</button>
-    <div id="alerts" class="alert"></div>
-    <div id="logs"></div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="js/camera.js"></script>
+  <h1>Diffuseur</h1>
+  <video id="localVideo" autoplay muted></video>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/camera.js"></script>
 </body>
 </html>
